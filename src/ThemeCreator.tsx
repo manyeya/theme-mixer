@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import type { FC, ReactNode } from 'react';
 import { Palette, Monitor, Type, Layout, Sliders, Shuffle, Download, Moon, Sun } from 'lucide-react';
-import { Fader, Knob, ConsoleButton, SectionLabel } from './components/MixerControls';
+import { Fader, Knob } from './components/MixerControls';
 
 // --- Type Definitions ---
 type DemoButtonVariant = 'primary' | 'secondary' | 'accent' | 'destructive' | 'outline';
@@ -76,25 +76,7 @@ const ColorPalettePreview: FC<ColorPalettePreviewProps> = ({ colors }) => (
   </div>
 );
 
-interface GradientPreviewProps {
-  name: string;
-  variable: string;
-}
-const GradientPreview: FC<GradientPreviewProps> = ({ name, variable }) => (
-  <div>
-    <div
-      className="w-full h-12 rounded border shadow-inner"
-      style={{
-        background: `var(${variable})`,
-        borderColor: 'oklch(var(--border) / 0.2)',
-        borderRadius: 'var(--radius)'
-      }}
-    />
-    <p className="text-[10px] uppercase tracking-wider mt-1 text-center text-gray-500">
-      {name}
-    </p>
-  </div>
-);
+
 
 const ThemeShowcase: FC = () => (
   <div
@@ -438,7 +420,6 @@ export default function App() {
 
   const MODES = [{ id: 'normal', name: 'Normal' }, { id: 'brutalist', name: 'Brutalist' }, { id: 'professional', name: 'Professional' }];
   const COLOR_HARMONIES = [{ id: 'complementary', name: 'Complementary' }, { id: 'analogous', name: 'Analogous' }, { id: 'triadic', name: 'Triadic' }, { id: 'split-complementary', name: 'Split-Comp' }];
-  const TYPE_SCALES = [{ name: 'Minor Third', ratio: 1.200 }, { name: 'Major Third', ratio: 1.250 }, { name: 'Perfect Fourth', ratio: 1.333 }, { name: 'Augmented Fourth', ratio: 1.414 }, { name: 'Golden Ratio', ratio: 1.618 }];
   const PALETTE_COLORS = [
     { name: "Primary", bgVar: "--primary", textVar: "--primary-foreground" }, { name: "Secondary", bgVar: "--secondary", textVar: "--secondary-foreground" },
     { name: "Accent", bgVar: "--accent", textVar: "--accent-foreground" }, { name: "Destructive", bgVar: "--destructive", textVar: "--destructive-foreground" },
