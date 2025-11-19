@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import type { FC, ReactNode } from 'react';
 import { Palette, Monitor, Type, Layout, Sliders, Shuffle, Download, Moon, Sun } from 'lucide-react';
 import { Fader, Knob } from './components/MixerControls';
+import logo from './assets/logo.png';
 
 // --- Type Definitions ---
 type DemoButtonVariant = 'primary' | 'secondary' | 'accent' | 'destructive' | 'outline';
@@ -463,7 +464,7 @@ export default function App() {
       {/* Header */}
       <header className="h-12 border-b border-[#333] bg-[#1a1a1a] flex items-center justify-between px-4 flex-shrink-0 z-20">
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 shadow-[0_0_10px_rgba(59,130,246,0.5)]"></div>
+          <img src={logo} alt="Theme Mixer Logo" className="w-6 h-6 rounded-full shadow-[0_0_10px_rgba(59,130,246,0.5)]" />
           <h1 className="text-sm font-bold tracking-[0.2em] text-gray-100">THEMEMIXER <span className="text-[10px] text-gray-500 font-normal ml-1">PRO</span></h1>
         </div>
         <div className="flex items-center gap-3">
