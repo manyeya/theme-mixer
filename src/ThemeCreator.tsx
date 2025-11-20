@@ -3,11 +3,13 @@ import type { FC, ReactNode } from 'react';
 import { Palette, Monitor, Type, Layout, Sliders, Shuffle, Download, Moon, Sun } from 'lucide-react';
 import { Fader, Knob } from './components/MixerControls';
 import logo from './assets/logo.png';
+import { formatColorValue, getColorFunction, oklchToRgb, rgbToOklch, oklchToHsl, hslToOklch, oklchToHex, hexToOklch } from './lib/colorConversions';
 
 // --- Type Definitions ---
 type DemoButtonVariant = 'primary' | 'secondary' | 'accent' | 'destructive' | 'outline';
 type Harmony = 'complementary' | 'analogous' | 'triadic' | 'split-complementary';
 type Mode = 'normal' | 'brutalist' | 'professional';
+type ColorSpace = 'oklch' | 'hsl' | 'rgb' | 'hex';
 
 // --- Helper Components ---
 interface DemoButtonProps {
@@ -149,6 +151,7 @@ const ThemeShowcase: FC = () => (
 // --- Main App Component ---
 export default function App() {
   const [mode, setMode] = useState<Mode>('normal');
+  const [colorSpace, setColorSpace] = useState<ColorSpace>('oklch');
   const [hue, setHue] = useState(260); // OKLCH blue is around 260
   const [neutralChroma, setNeutralChroma] = useState(0.02);
   const [primaryChroma, setPrimaryChroma] = useState(0.15);
@@ -160,6 +163,14 @@ export default function App() {
   const [radius, setRadius] = useState(0.5);
   const [headingFont, setHeadingFont] = useState('Inter');
   const [bodyFont, setBodyFont] = useState('Inter');
+
+  // Color space specific states (for HSL and RGB modes)
+  const [hslHue, setHslHue] = useState(220);
+  const [hslSaturation, setHslSaturation] = useState(80);
+  const [hslLightness, setHslLightness] = useState(50);
+  const [rgbRed, setRgbRed] = useState(59);
+  const [rgbGreen, setRgbGreen] = useState(130);
+  const [rgbBlue, setRgbBlue] = useState(246);
 
   // Layout State
   const [containerWidth, setContainerWidth] = useState(42); // rem
@@ -210,6 +221,44 @@ export default function App() {
 
     link.href = `https://fonts.googleapis.com/css2?${fontQuery}&display=swap`;
   }, [headingFont, bodyFont]);
+
+  // Synchronize color values when switching color spaces
+  useEffect(() => {
+    if (colorSpace === 'hsl') {
+      // Convert current OKLCH to HSL
+      const [h, s, l] = oklchToHsl(lightness / 100, primaryChroma, hue);
+      setHslHue(h);
+      setHslSaturation(s);
+      setHslLightness(l);
+    } else if (colorSpace === 'rgb') {
+      // Convert current OKLCH to RGB
+      const [r, g, b] = oklchToRgb(lightness / 100, primaryChroma, hue);
+      setRgbRed(r);
+      setRgbGreen(g);
+      setRgbBlue(b);
+    }
+  }, [colorSpace]); // Only run when color space changes
+
+  // Sync OKLCH values when HSL changes
+  useEffect(() => {
+    if (colorSpace === 'hsl') {
+      const [l, c, h] = hslToOklch(hslHue, hslSaturation, hslLightness);
+      setHue(h);
+      setPrimaryChroma(c);
+      setLightness(l * 100);
+    }
+  }, [hslHue, hslSaturation, hslLightness, colorSpace]);
+
+  // Sync OKLCH values when RGB changes
+  useEffect(() => {
+    if (colorSpace === 'rgb') {
+      const [l, c, h] = rgbToOklch(rgbRed, rgbGreen, rgbBlue);
+      setHue(h);
+      setPrimaryChroma(c);
+      setLightness(l * 100);
+    }
+  }, [rgbRed, rgbGreen, rgbBlue, colorSpace]);
+
 
 
   const themeConfig = useMemo(() => {
@@ -488,7 +537,19 @@ export default function App() {
           <div className="h-4 w-px bg-[#333]"></div>
           <button
             onClick={() => {
-              const css = `:root {\n${Object.entries(themeStyles).map(([k, v]) => `  ${k}: ${v};`).join('\n')}\n}`;
+              const colorFn = getColorFunction(colorSpace);
+              const css = `:root {\n${Object.entries(themeStyles).map(([k, v]) => {
+                // Skip non-color properties and gradient properties
+                if (k.includes('--font') || k.includes('--radius') || k.includes('--container') ||
+                  k.includes('--gap') || k.includes('--padding') || k.includes('gradient')) {
+                  return `  ${k}: ${v};`;
+                }
+                // For color variables, wrap in the appropriate function
+                if (colorSpace === 'hex') {
+                  return `  ${k}: ${v};`; // HEX values don't need function wrapper
+                }
+                return `  ${k}: ${colorFn}(${v});`;
+              }).join('\n')}\n}`;
               navigator.clipboard.writeText(css);
               alert('CSS copied to clipboard!');
             }}
@@ -605,38 +666,78 @@ export default function App() {
                   <Sliders size={10} /> Global
                 </h2>
               </div>
-              <div className="p-3 flex-1 flex flex-col gap-2 overflow-hidden">
+              <div className="p-3 flex-1 grid grid-cols-2 gap-2 overflow-hidden">
                 <div>
                   <div className="text-[9px] uppercase tracking-wider text-gray-500 font-bold mb-1">Mode</div>
-                  <div className="grid grid-cols-1 gap-1">
+                  <div className="flex flex-col gap-0.5">
                     {MODES.map(item => (
-                      <button
+                      <label
                         key={item.id}
-                        onClick={() => setMode(item.id as Mode)}
-                        className={`px-2 py-1 rounded text-[9px] font-medium uppercase tracking-wide border transition-all ${mode === item.id
-                          ? 'bg-blue-600 text-white border-blue-400 shadow-[0_0_8px_rgba(37,99,235,0.4)]'
-                          : 'bg-[#222] text-gray-400 border-[#333] hover:bg-[#2a2a2a] hover:border-[#444]'
-                          }`}
+                        className="flex items-center gap-2 px-1 py-0.5 rounded cursor-pointer hover:bg-[#2a2a2a] transition-colors"
                       >
-                        {item.name}
-                      </button>
+                        <input
+                          type="radio"
+                          name="mode"
+                          value={item.id}
+                          checked={mode === item.id}
+                          onChange={(e) => setMode(e.target.value as Mode)}
+                          className="w-3 h-3 accent-blue-600"
+                        />
+                        <span className="text-[9px] font-medium uppercase tracking-wide text-gray-400">
+                          {item.name}
+                        </span>
+                      </label>
                     ))}
                   </div>
                 </div>
                 <div>
                   <div className="text-[9px] uppercase tracking-wider text-gray-500 font-bold mb-1">Harmony</div>
-                  <div className="grid grid-cols-2 gap-1">
+                  <div className="flex flex-col gap-0.5">
                     {COLOR_HARMONIES.map(item => (
-                      <button
+                      <label
                         key={item.id}
-                        onClick={() => setHarmony(item.id as Harmony)}
-                        className={`px-2 py-1 rounded text-[9px] font-medium uppercase tracking-wide border transition-all ${harmony === item.id
-                          ? 'bg-orange-600 text-white border-orange-400 shadow-[0_0_8px_rgba(234,88,12,0.4)]'
-                          : 'bg-[#222] text-gray-400 border-[#333] hover:bg-[#2a2a2a] hover:border-[#444]'
-                          }`}
+                        className="flex items-center gap-2 px-1 py-0.5 rounded cursor-pointer hover:bg-[#2a2a2a] transition-colors"
                       >
-                        {item.name}
-                      </button>
+                        <input
+                          type="radio"
+                          name="harmony"
+                          value={item.id}
+                          checked={harmony === item.id}
+                          onChange={(e) => setHarmony(e.target.value as Harmony)}
+                          className="w-3 h-3 accent-orange-600"
+                        />
+                        <span className="text-[9px] font-medium uppercase tracking-wide text-gray-400">
+                          {item.name}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[9px] uppercase tracking-wider text-gray-500 font-bold mb-1">Color Space</div>
+                  <div className="flex flex-col gap-0.5">
+                    {[
+                      { id: 'oklch', name: 'OKLCH' },
+                      { id: 'hsl', name: 'HSL' },
+                      { id: 'rgb', name: 'RGB' },
+                      { id: 'hex', name: 'HEX' }
+                    ].map(item => (
+                      <label
+                        key={item.id}
+                        className="flex items-center gap-2 px-1 py-0.5 rounded cursor-pointer hover:bg-[#2a2a2a] transition-colors"
+                      >
+                        <input
+                          type="radio"
+                          name="colorSpace"
+                          value={item.id}
+                          checked={colorSpace === item.id}
+                          onChange={(e) => setColorSpace(e.target.value as ColorSpace)}
+                          className="w-3 h-3 accent-purple-600"
+                        />
+                        <span className="text-[9px] font-medium uppercase tracking-wide text-gray-400">
+                          {item.name}
+                        </span>
+                      </label>
                     ))}
                   </div>
                 </div>
@@ -651,45 +752,143 @@ export default function App() {
                 </h2>
               </div>
               <div className="p-3 flex-1 flex flex-col gap-2 overflow-hidden justify-center">
-                <div className="flex items-center justify-center gap-2">
-                  <Knob
-                    value={primaryChroma * 100}
-                    min={5}
-                    max={30}
-                    onChange={(v) => setPrimaryChroma(v / 100)}
-                    label="P.Chr"
-                    size={40}
-                  />
-                  <Knob
-                    value={hue}
-                    min={0}
-                    max={360}
-                    onChange={setHue}
-                    label="Hue"
-                    size={56}
-                  />
-                  <Knob
-                    value={neutralChroma * 100}
-                    min={0}
-                    max={10}
-                    onChange={(v) => setNeutralChroma(v / 100)}
-                    label="N.Chr"
-                    size={40}
-                  />
-                </div>
-                <div className="px-4">
-                  <Fader
-                    value={lightness}
-                    min={90}
-                    max={100}
-                    step={0.5}
-                    onChange={setLightness}
-                    label="Light"
-                    color="bg-orange-500"
-                    orientation="horizontal"
-                    height="h-8"
-                  />
-                </div>
+                {colorSpace === 'oklch' && (
+                  <>
+                    <div className="flex items-center justify-center gap-2">
+                      <Knob
+                        value={primaryChroma * 100}
+                        min={5}
+                        max={30}
+                        onChange={(v) => setPrimaryChroma(v / 100)}
+                        label="P.Chr"
+                        size={40}
+                      />
+                      <Knob
+                        value={hue}
+                        min={0}
+                        max={360}
+                        onChange={setHue}
+                        label="Hue"
+                        size={56}
+                      />
+                      <Knob
+                        value={neutralChroma * 100}
+                        min={0}
+                        max={10}
+                        onChange={(v) => setNeutralChroma(v / 100)}
+                        label="N.Chr"
+                        size={40}
+                      />
+                    </div>
+                    <div className="px-4">
+                      <Fader
+                        value={lightness}
+                        min={90}
+                        max={100}
+                        step={0.5}
+                        onChange={setLightness}
+                        label="Light"
+                        color="bg-orange-500"
+                        orientation="horizontal"
+                        height="h-8"
+                      />
+                    </div>
+                  </>
+                )}
+
+                {colorSpace === 'hsl' && (
+                  <>
+                    <div className="flex items-center justify-center gap-2">
+                      <Knob
+                        value={hslSaturation}
+                        min={0}
+                        max={100}
+                        onChange={setHslSaturation}
+                        label="Sat"
+                        size={40}
+                      />
+                      <Knob
+                        value={hslHue}
+                        min={0}
+                        max={360}
+                        onChange={setHslHue}
+                        label="Hue"
+                        size={56}
+                      />
+                    </div>
+                    <div className="px-4">
+                      <Fader
+                        value={hslLightness}
+                        min={0}
+                        max={100}
+                        step={1}
+                        onChange={setHslLightness}
+                        label="Light"
+                        color="bg-cyan-500"
+                        orientation="horizontal"
+                        height="h-8"
+                      />
+                    </div>
+                  </>
+                )}
+
+                {colorSpace === 'rgb' && (
+                  <div className="px-2 flex flex-col gap-2">
+                    <Fader
+                      value={rgbRed}
+                      min={0}
+                      max={255}
+                      step={1}
+                      onChange={setRgbRed}
+                      label="Red"
+                      color="bg-red-500"
+                      orientation="horizontal"
+                      height="h-6"
+                    />
+                    <Fader
+                      value={rgbGreen}
+                      min={0}
+                      max={255}
+                      step={1}
+                      onChange={setRgbGreen}
+                      label="Green"
+                      color="bg-green-500"
+                      orientation="horizontal"
+                      height="h-6"
+                    />
+                    <Fader
+                      value={rgbBlue}
+                      min={0}
+                      max={255}
+                      step={1}
+                      onChange={setRgbBlue}
+                      label="Blue"
+                      color="bg-blue-500"
+                      orientation="horizontal"
+                      height="h-6"
+                    />
+                  </div>
+                )}
+
+                {colorSpace === 'hex' && (
+                  <div className="px-4 flex flex-col items-center gap-2">
+                    <div className="text-[9px] uppercase tracking-wider text-gray-500 font-bold">HEX Input</div>
+                    <input
+                      type="color"
+                      value={oklchToHex(0.7, primaryChroma, hue)}
+                      onChange={(e) => {
+                        const [l, c, h] = hexToOklch(e.target.value);
+                        setHue(h);
+                        setPrimaryChroma(c);
+                        setLightness(l * 100);
+                      }}
+                      className="w-20 h-20 cursor-pointer rounded border-2 border-[#333]"
+                    />
+                    <div className="text-[10px] font-mono text-gray-400">
+                      {oklchToHex(0.7, primaryChroma, hue)}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
